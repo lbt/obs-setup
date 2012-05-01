@@ -227,7 +227,20 @@ start_fe() {
 }
 
 # We need a local config file
-. setup-obs.conf
+
+if [[ -f setup-obs.conf ]]; then
+    . setup-obs.conf
+else 
+    cat <<EOF > setup-obs.conf
+# This is the internal name of the machine providing the api
+OBSFE_INT="obsfe.example.com"
+
+# This is the internal name of the machine providing the bs_srcserver
+OBSBE_SRC="obsbe.example.com"
+EOF
+    echo "You had no setup-obs.conf - one has been created, please edit it"
+    exit 1
+fi
 
 role=$1
 
