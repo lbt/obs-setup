@@ -233,6 +233,10 @@ if [[ -f setup-obs.conf ]]; then
     . setup-obs.conf
 else 
     cat <<EOF > setup-obs.conf
+# Remove these lines when you edit the file
+echo "Please edit setup-obs.conf before running setup-obs.sh or it won't work"
+exit 1
+
 # This is the internal name of the machine providing the api
 OBSFE_INT="obsfe.example.com"
 
