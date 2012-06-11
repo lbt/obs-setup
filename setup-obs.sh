@@ -5,8 +5,9 @@
 
 add_repos() {
 # Use Devel *aswell*
-    zypper --no-gpg-checks ar http://repo.pub.meego.com/Mer:/OBS:/Testing:/Devel/openSUSE_11.4/Mer:OBS:Testing:Devel.repo
-    zypper --no-gpg-checks ar http://repo.pub.meego.com//Mer:/OBS:/Testing/openSUSE_11.4/Mer:OBS:Testing.repo
+    for repo in $ZYPPER_REPOS; do
+	zypper --no-gpg-checks ar $repo
+    done
     zypper --no-gpg-checks ref
 }
 
@@ -242,6 +243,16 @@ OBSFE_INT="obsfe.example.com"
 
 # This is the internal name of the machine providing the bs_srcserver
 OBSBE_SRC="obsbe.example.com"
+
+## Options below here are typically only required if you need to use
+## development or testing code.
+
+# These are the repos that should be used for the OBS installation.
+# 
+ZYPPER_REPOS="http://repo.pub.meego.com/releases/Mer-OBS/latest.repo"
+
+# Developers may want to use:
+# ZYPPER_REPOS="http://repo.pub.meego.com/Mer:/OBS:/Testing:/Devel/openSUSE_11.4/Mer:OBS:Testing:Devel.repo http://repo.pub.meego.com//Mer:/OBS:/Testing/openSUSE_11.4/Mer:OBS:Testing.repo"
 EOF
     echo "You had no setup-obs.conf - one has been created, please edit it"
     exit 1
