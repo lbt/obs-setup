@@ -337,6 +337,8 @@ case $role in
 	setupmysql_fe
 	echo ________________________________________ $role: rake_fe
 	rake_fe
+	echo ________________________________________ $role: setperms_fe :::  again
+	setperms_fe
 	echo ________________________________________ $role: start_fe
 	start_fe
 	;;
