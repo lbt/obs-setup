@@ -22,7 +22,8 @@ enable_be() {
 
 configure_be() {
 
-    sed -i 's,^my.*frontend\s*=.*,my \$frontend = "'"${OBSFE_INT}"'";,' \
+    sed -i -e 's,^my.*frontend\s*=.*,my \$frontend = "'"${OBSFE_INT}"'";,' \
+           -e 's,^our.*obsname\s*=.*,my \$obsname = "'"${OBSBE_REPO}"'"; # Use the repo name as there can be only one,' \
 	/usr/lib/obs/server/BSConfig.pm
     sed -i -e 's,^OBS_SCHEDULER_ARCHITECTURES=.*,OBS_SCHEDULER_ARCHITECTURES="i586 x86_64 armv7el armv8el",' \
 	/etc/sysconfig/obs-server
