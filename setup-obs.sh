@@ -12,7 +12,7 @@ add_repos() {
 }
 
 install_be() {
-    zypper --no-gpg-checks --non-interactive install obs-server
+    zypper --no-gpg-checks --non-interactive install obs-server rsync
 }
 
 enable_be() {
@@ -23,11 +23,23 @@ enable_be() {
 
 configure_be() {
 
-    sed -i -e 's,^my.*frontend\s*=.*,my \$frontend = "'"${OBSFE_INT}"'";,' \
-           -e 's,^our.*obsname\s*=.*,our \$obsname = "'"${OBSBE_REPO}"'"; # Use the repo name as there can be only one,' \
+    sed -i -e "s,^my.*frontend\s*=.*,my \$frontend = '${OBSFE_INT}';," \
+           -e "s,^our.*obsname\s*=.*,our \$obsname = '${OBSBE_REPO}'; # Use the repo name as there can be only one," \
+           -e "s,^#our.*stageserver\s*=.*,our \$stageserver = 'rsync://${OBSRSYNC_INT}/repo'; # Publish to the frontend," \
 	/usr/lib/obs/server/BSConfig.pm
     sed -i -e 's,^OBS_SCHEDULER_ARCHITECTURES=.*,OBS_SCHEDULER_ARCHITECTURES="i586 x86_64 armv7el armv8el",' \
 	/etc/sysconfig/obs-server
+
+    cat <<EOF >> /etc/sysconfig/obs-server
+export RSYNC_PASSWORD=\$(cat /etc/rsync.obsrun.secret)
+EOF
+
+    # This value must be the obsrun user password on the rsyncd server
+    cat <<EOF > /etc/rsync.obsrun.secret
+${RSYNC_PASSWD}
+EOF
+    chown obsrun /etc/rsync.obsrun.secret
+    chmod 600 /etc/rsync.obsrun.secret
 }
 
 start_be() {
@@ -87,7 +99,7 @@ start_sign() {
 
 
 install_fe() {
-    zypper --no-gpg-checks --non-interactive install obs-api mysql memcached apache2 apache2-mod_xforward rubygem-passenger-apache2 
+    zypper --no-gpg-checks --non-interactive install obs-api mysql memcached apache2 apache2-mod_xforward rubygem-passenger-apache2 rsync
 }
 
 enable_fe() {
@@ -95,6 +107,43 @@ enable_fe() {
     sed -i -e's/^# Default-Start:  2 3 5$/# Default-Start:  3 5/' /etc/init.d/mysql 
 
     chkconfig --add memcached obsapidelayed apache2 mysql
+}
+
+configure_rsync() {
+
+################ rsync
+
+    mkdir -p /srv/obs/repos/
+
+    cat <<EOF > /etc/rsyncd.secrets
+# user:passwd
+# This must match on the BE
+obsrun:${RSYNC_PASSWD}
+EOF
+
+    cat <<EOF > /etc/rsyncd.conf
+# Setup by setup-obs.sh to permit repos to be published from the web server.
+
+gid = users
+use chroot = true
+transfer logging = true
+log format = %h %o %f %l %b
+log file = /var/log/rsyncd.log
+max verbosity = 2
+pid file = /var/run/rsyncd.pid
+slp refresh = 300
+use slp = false
+[repo]
+        hosts allow = ${OBSBE_REPO}
+        read only = false
+        path = /srv/obs/repos/
+        auth users = obsrun
+        secrets file = /etc/rsyncd.secrets
+        uid = wwwrun
+        dont compress = *.gz *.tgz *.zip *.z *.rpm *.deb *.iso *.bz2 *.tbz
+EOF
+    chkconfig rsyncd on
+    rcrsyncd restart
 }
 
 configure_fe() {
@@ -244,6 +293,12 @@ OBSFE_INT="obsfe.example.com"
 # This is the internal name of the machine providing the bs_srcserver
 OBSBE_SRC="obsbe.example.com"
 
+# This password permits the repo server to publish binaries to the frontend
+RSYNC_PASSWORD="$(dd if=/dev/urandom bs=256 count=10 2>/dev/null |sha256sum| cut -f1 -d" ")"
+# This is the internal user@host of the machine providing the rsync
+# target for the download service (it will be addressed as rsync::${OBSRSYNC_INT}/repos
+OBSRSYNC_INT="obsrun@obsfe.example.com"
+
 ## Options below here are typically only required if you need to use
 ## development or testing code.
 
@@ -300,6 +355,12 @@ case $role in
 	echo ________________________________________ $role: start_worker
 	start_worker
 	;;
+
+    download )
+	# It may be nice to setup the rsync/www as a download server role
+	# Need to ensure it doesn't conflict with the fe role though
+	;;
+
     fe )
 
         # This is the internal name of the machine providing the bs_srcserver
@@ -325,6 +386,8 @@ case $role in
 	install_fe
 	echo ________________________________________ $role: enable_fe
 	enable_fe
+	echo ________________________________________ $role: configure_rsync
+	configure_rsync
 	echo ________________________________________ $role: configure_fe
 	configure_fe
 	echo ________________________________________ $role: createcert_fe
